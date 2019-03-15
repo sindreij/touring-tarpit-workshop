@@ -14,6 +14,7 @@ enum Instruction {
     Halt,
     Out(i32),
     BranchIfPlus(i32, i32),
+    Subtract(i32, i32),
 }
 
 impl Machine {
@@ -44,13 +45,13 @@ impl Machine {
             0 => Ok(Halt),
             1 => Ok(Out(self.fetch_pointer())),
             2 => Ok(BranchIfPlus(self.fetch_pointer(), self.fetch_pointer())),
+            3 => Ok(Subtract(self.fetch_pointer(), self.fetch_pointer())),
             _ => Err(format!("Unknown instruction {}", inst)),
         }
     }
 
     fn run(&mut self) -> Result<(), Box<Error>> {
         loop {
-            // let inst = self.mem[self.pc];
             let inst = self.next_instruction()?;
 
             use Instruction::*;
@@ -66,6 +67,11 @@ impl Machine {
                     if self.mem[srcptr as usize] < 128 {
                         self.pc = jmpptr;
                     }
+                }
+                Subtract(dstptr, srcptr) => {
+                    let dstVal = self.mem[dstptr as usize];
+                    let srcVal = self.mem[srcptr as usize];
+                    self.mem[dstptr as usize] = dstVal.wrapping_sub(srcVal);
                 }
             }
         }
