@@ -1,0 +1,7 @@
+[package]
+name = "mystuff"
+version = "0.1.0"
+authors = ["Sindre Johansen <sindre@iterate.no>"]
+edition = "2018"
+
+[dependencies]
