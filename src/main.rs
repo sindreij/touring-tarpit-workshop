@@ -1,9 +1,9 @@
 use std::env;
 use std::error::Error;
+use std::fmt;
 use std::fs::File;
+use std::io;
 use std::io::prelude::*;
-
-use byteorder::{ByteOrder, LittleEndian};
 
 struct Machine {
     mem: Vec<u8>,
@@ -15,13 +15,24 @@ enum Instruction {
     Out(i32),
     BranchIfPlus(i32, i32),
     Subtract(i32, i32),
+    InByte(i32),
+}
+
+impl fmt::Display for Instruction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Instruction::*;
+        match self {
+            Halt => write!(f, "HLT"),
+            Out(a) => write!(f, "OUT [{}]", a),
+            BranchIfPlus(a, b) => write!(f, "BIP {}, [{}]", a, b),
+            Subtract(a, b) => write!(f, "SUB [{}], [{}]", a, b),
+            InByte(a) => write!(f, "IN [{}]", a),
+        }
+    }
 }
 
 impl Machine {
-    fn from_args() -> Result<Machine, Box<Error>> {
-        let args: Vec<_> = env::args().collect();
-        let programfile = &args[1];
-
+    fn from_file(programfile: &str) -> Result<Machine, Box<Error>> {
         let mut memfile = File::open(programfile)?;
 
         let mut mem = Vec::new();
@@ -31,9 +42,13 @@ impl Machine {
     }
 
     fn fetch_pointer(&mut self) -> i32 {
-        let res = LittleEndian::read_i32(&self.mem[(self.pc as usize)..]);
+        let addr = &self.mem[(self.pc as usize)..];
+        let ptr: i32 = (addr[0] as i32)
+            | ((addr[1] as i32) << 8)
+            | ((addr[2] as i32) << 16)
+            | ((addr[3] as i32) << 24);
         self.pc += 4;
-        res
+        ptr
     }
 
     fn next_instruction(&mut self) -> Result<Instruction, String> {
@@ -46,8 +61,20 @@ impl Machine {
             1 => Ok(Out(self.fetch_pointer())),
             2 => Ok(BranchIfPlus(self.fetch_pointer(), self.fetch_pointer())),
             3 => Ok(Subtract(self.fetch_pointer(), self.fetch_pointer())),
+            4 => Ok(InByte(self.fetch_pointer())),
             _ => Err(format!("Unknown instruction {}", inst)),
         }
+    }
+
+    fn disassemble(&mut self) -> Result<(), Box<Error>> {
+        while (self.pc as usize) < self.mem.len() {
+            let inst_pc = self.pc;
+            if let Ok(inst) = self.next_instruction() {
+                // Just ignore everything that is not a valid instruction
+                println!("{}    {}", inst_pc, inst);
+            }
+        }
+        Ok(())
     }
 
     fn run(&mut self) -> Result<(), Box<Error>> {
@@ -69,9 +96,14 @@ impl Machine {
                     }
                 }
                 Subtract(dstptr, srcptr) => {
-                    let dstVal = self.mem[dstptr as usize];
-                    let srcVal = self.mem[srcptr as usize];
-                    self.mem[dstptr as usize] = dstVal.wrapping_sub(srcVal);
+                    let dst_val = self.mem[dstptr as usize];
+                    let src_val = self.mem[srcptr as usize];
+                    self.mem[dstptr as usize] = dst_val.wrapping_sub(src_val);
+                }
+                InByte(dstptr) => {
+                    let mut buffer = [0];
+                    io::stdin().read_exact(&mut buffer)?;
+                    self.mem[dstptr as usize] = buffer[0];
                 }
             }
         }
@@ -79,8 +111,16 @@ impl Machine {
 }
 
 fn main() -> Result<(), Box<Error>> {
-    let mut machine = Machine::from_args()?;
-    machine.run()?;
+    let args: Vec<_> = env::args().collect();
+    if args.len() == 2 {
+        let mut machine = Machine::from_file(&args[1])?;
+        machine.run()?;
+    } else if args.len() == 3 && args[1] == "disassemble" {
+        let mut machine = Machine::from_file(&args[2])?;
+        machine.disassemble()?;
+    } else {
+        eprintln!("Usage: {} [disassemble] <FILE>", args[0]);
+    }
 
     Ok(())
 }

@@ -5,4 +5,3 @@ authors = ["Sindre Johansen <sindre@iterate.no>"]
 edition = "2018"
 
 [dependencies]
-byteorder = "1"
