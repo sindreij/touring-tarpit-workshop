@@ -2,9 +2,8 @@ use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::Cursor;
 
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian};
 
 struct Machine {
     mem: Vec<u8>,
@@ -24,13 +23,10 @@ impl Machine {
         Ok(Machine { mem, pc: 0 })
     }
 
-    fn fetch_pointer(&mut self) -> Result<usize, Box<Error>> {
+    fn fetch_pointer(&mut self) -> usize {
         let bytes = &self.mem[self.pc..self.pc + 4];
         self.pc += 4;
-
-        let mut rdr = Cursor::new(bytes);
-
-        Ok(rdr.read_i32::<LittleEndian>()? as usize)
+        LittleEndian::read_i32(bytes) as usize
     }
 
     fn run(&mut self) -> Result<(), Box<Error>> {
@@ -45,7 +41,7 @@ impl Machine {
                 }
 
                 1 => {
-                    let ptr = self.fetch_pointer()?;
+                    let ptr = self.fetch_pointer();
                     let ch = self.mem[ptr] as char;
                     print!("{}", ch);
                 }
