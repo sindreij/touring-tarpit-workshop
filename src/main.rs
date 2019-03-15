@@ -63,7 +63,6 @@ impl Machine {
                     print!("{}", ch);
                 }
                 BranchIfPlus(jmpptr, srcptr) => {
-                    // Branch If Plus
                     if self.mem[srcptr as usize] < 128 {
                         self.pc = jmpptr;
                     }
